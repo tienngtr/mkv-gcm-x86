@@ -1,0 +1,952 @@
+
+
+
+
+NBCuong                                                       N.B. Cuong
+Internet-Draft                                               D.V. Truong
+Intended status: InformationalVietnam Government Information Security Commission
+Expires: 7 January 2027                                      6 July 2026
+
+
+                Encryption algorithms - Block cipher MKV
+                   draft-nbcuong-mkv-block-cipher-00
+
+Abstract
+
+   This document specifies the MKV block cipher for use in cryptographic
+   mechanisms supporting information security.  The algorithm may be
+   used to provide confidentiality of information during transmission,
+   processing, and storage in information systems.
+
+About This Document
+
+   This note is to be removed before publishing as an RFC.
+
+Status of This Memo
+
+   This Internet-Draft is submitted in full conformance with the
+   provisions of BCP 78 and BCP 79.
+
+   Internet-Drafts are working documents of the Internet Engineering
+   Task Force (IETF).  Note that other groups may also distribute
+   working documents as Internet-Drafts.  The list of current Internet-
+   Drafts is at https://datatracker.ietf.org/drafts/current/.
+
+   Internet-Drafts are draft documents valid for a maximum of six months
+   and may be updated, replaced, or obsoleted by other documents at any
+   time.  It is inappropriate to use Internet-Drafts as reference
+   material or to cite them other than as "work in progress."
+
+   This Internet-Draft will expire on 7 January 2027.
+
+Copyright Notice
+
+   Copyright (c) 2026 IETF Trust and the persons identified as the
+   document authors.  All rights reserved.
+
+
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 1]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+   This document is subject to BCP 78 and the IETF Trust's Legal
+   Provisions Relating to IETF Documents (https://trustee.ietf.org/
+   license-info) in effect on the date of publication of this document.
+   Please review these documents carefully, as they describe your rights
+   and restrictions with respect to this document.  Code Components
+   extracted from this document must include Revised BSD License text as
+   described in Section 4.e of the Trust Legal Provisions and are
+   provided without warranty as described in the Revised BSD License.
+
+Table of Contents
+
+   1.  Introduction  . . . . . . . . . . . . . . . . . . . . . . . .   2
+   2.  MKV block cipher  . . . . . . . . . . . . . . . . . . . . . .   3
+     2.1.  General . . . . . . . . . . . . . . . . . . . . . . . . .   3
+     2.2.  Encryption process  . . . . . . . . . . . . . . . . . . .   4
+       2.2.1.  General . . . . . . . . . . . . . . . . . . . . . . .   4
+       2.2.2.  State representation  . . . . . . . . . . . . . . . .   4
+       2.2.3.  Initialization  . . . . . . . . . . . . . . . . . . .   5
+       2.2.4.  Round keys and whitening keys . . . . . . . . . . . .   5
+       2.2.5.  Round transformation  . . . . . . . . . . . . . . . .   5
+       2.2.6.  Final transformation  . . . . . . . . . . . . . . . .   6
+       2.2.7.  Output  . . . . . . . . . . . . . . . . . . . . . . .   6
+     2.3.  Decryption process  . . . . . . . . . . . . . . . . . . .   6
+       2.3.1.  General . . . . . . . . . . . . . . . . . . . . . . .   6
+       2.3.2.  Initialization  . . . . . . . . . . . . . . . . . . .   6
+       2.3.3.  Whitening transformation  . . . . . . . . . . . . . .   6
+       2.3.4.  Inverse round transformation  . . . . . . . . . . . .   6
+       2.3.5.  Output  . . . . . . . . . . . . . . . . . . . . . . .   7
+     2.4.  Basic transformations . . . . . . . . . . . . . . . . . .   7
+       2.4.1.  SubCells transformation . . . . . . . . . . . . . . .   7
+       2.4.2.  invSubCells transformation  . . . . . . . . . . . . .   8
+       2.4.3.  MixWords transformation . . . . . . . . . . . . . . .   9
+       2.4.4.  invMixWords transformation  . . . . . . . . . . . . .  10
+       2.4.5.  XWords transformation . . . . . . . . . . . . . . . .  12
+     2.5.  Key schedule process  . . . . . . . . . . . . . . . . . .  12
+   Appendix A.  Test vector for MKV  . . . . . . . . . . . . . . . .  14
+     A.1.  MKV with 128-bit block size . . . . . . . . . . . . . . .  14
+     A.2.  MKV with 256-bit block size . . . . . . . . . . . . . . .  16
+   Appendix B.  Bibliography.  . . . . . . . . . . . . . . . . . . .  16
+   Authors' Addresses  . . . . . . . . . . . . . . . . . . . . . . .  17
+
+1.  Introduction
+
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 2]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+The MKV block cipher is specified with two block sizes: a 256-bit
+version, intended to provide a higher security margin in the context
+of post-quantum considerations, and a 128-bit version for use in
+transitional deployment scenarios. Each version supports three key
+lengths, allowing different security levels depending on application
+requirements.
+The MKV block cipher adopts a substitution - permutation network (SPN)
+structure based on the FLC scheme. The design is intended to achieve
+security properties consistent with the Luby-Rackoff model [3].
+In addition, the FLC-SDS structure is designed to provide resistance
+against differential and linear cryptanalysis under commonly accepted
+assumptions [4].
+The cipher employs 8-bit S-boxes to provide nonlinearity and an MDS
+matrix to achieve diffusion. These components are selected based on
+established cryptographic criteria and are optimized for both hardware
+and software implementations [4], [6], [7].
+The key schedule is based on an iterative design approach described
+in [6] and is intended to provide resistance against structural and
+related-key attacks.
+The MKV block cipher is designed to provide resistance against known
+forms of cryptanalysis, including differential, linear, boomerang,
+integral, algebraic, related-key, and impossible differential attacks,
+within the claimed security margins. Evaluation of resistance against
+quantum adversaries, including Grover's and Simon's algorithms, remains
+an area of ongoing research.
+The algorithm is designed to achieve efficient performance across a
+range of hardware and software platforms suitable for information security
+applications.
+
+2.  MKV block cipher
+
+2.1.  General
+
+The MKV block cipher shall operate on fixed-length data blocks of size
+n?{128, 256} bits.
+The cipher shall be denoted as MKV-l, where l represents the block size.
+For each block size, the cipher shall support three key lengths k, with
+the corresponding number of rounds R defined as follows:
+For MKV-128: k?{128, 192, 256} with R=7, 8, 9, respectively
+For MKV-256: k?{256, 384, 512} with R=7, 8, 9, respectively
+The set of supported variants is summarized in Table 1.
+
+                   Figure 1: - The versions of MKV.
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 3]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+   Version      l       k       R
+   MKV-128      128     128     7
+            192 8
+            256 9
+   MKV-256      256     256     7
+            384 8
+            512 9
+
+   The MKV block cipher shall use an iterative round function applied
+   for R
+      rounds during both encryption and decryption.  Each round function
+      shall consist of the following transformations: SubCells:
+      nonlinear byte-wise substitution using an S-box; MixWords: linear
+      transformation applied independently to each sub-state; XWords:
+      mixing transformation combining sub-states using bitwise
+      exclusive-OR operations; AddRoundKey: addition of the round key to
+      the state using bitwise exclusive-OR.
+
+   The inverse transformations shall be used for decryption:
+      invSubCells: inverse transformations of SubCells; 1 invMixWords:
+      inverse transformations of MixWords.
+
+   The encryption and decryption processes are specified in Clauses
+   2.2 and 2.3,
+      respectively.  The key schedule process is specified in Clause
+      2.5.
+
+2.2.  Encryption process
+
+2.2.1.  General
+
+   The encryption process shall transform a plaintext block P in {0,1}^n
+   into a ciphertext block C in {0,1}^n using a master key K_master.
+
+2.2.2.  State representation
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 4]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+The internal state X shall be an n-bit string.
+The state shall be partitioned into four sub-states:
+   X=(X_0, X_1, X_2,X_3)
+where each sub-state X_i has size w=n/4 bits.
+Each sub-state shall be represented as a sequence of bytes:
+   X_i=(x_(i,0), x_(i,1), ..., x_(i,t-1))
+where:
+   x_(i,j) in {0,1}^8
+   t=w/8
+Thus:
+   t=4 for MKV-128
+   t=8 for MKV-256
+The state X may be represented as a matrix of size t×4, where each column
+corresponds to one sub-state.
+
+2.2.3.  Initialization
+
+   The initial state shall be set as:
+      X?P
+
+   where the mapping from P to X shall be performed in a consistent
+   byte
+      ordering defined by the implementation.
+
+2.2.4.  Round keys and whitening keys
+
+   Let:
+      K_r in {0, 1}^2n, for r=0, ..., R-1, be the round keys K_(r,0) in
+      {0, 1}^n, for r=0, ..., R-1, be the low bit half of round key K_r
+      K_(r,1) in {0, 1}^n, for r=0, ..., R-1, be the high half of round
+      key K_r K_post in {0, 1}^2, be the post-whitening key
+
+   These keys shall be derived from the master key K_master ? using
+   the key
+      schedule specified in Clause 2.5.
+
+2.2.5.  Round transformation
+
+   For each round r=0, ..., R-1, the state shall be updated as follows:
+      X <- X (+) K_r,0
+      X <- SubCells(X)
+      X <- MixWords(X)
+      X <- X (+) K_r,1
+      X <- SubCells(X)
+      X <- XWords(X)
+      X <- X (+) K_r
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 5]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+2.2.6.  Final transformation
+
+   X <- X (+) K_post
+
+2.2.7.  Output
+
+   The ciphertext shall be defined as:
+      C <- X
+
+   The encryption process can be fully described as follows: (1) X <- P
+
+   (2) For r=0 to R-1 do
+      (2.1) X <- X <- K_r^0
+      (2.2) X <- SubCells(X)
+      (2.3) X <- MixWords(X)
+      (2.4) X <- X (+) K_r^1
+      (2.5) X <- SubCells(X)
+      (2.6) X <- XWords(X)
+
+   (3) C <- X (+) K_post
+
+2.3.  Decryption process
+
+2.3.1.  General
+
+   The decryption process shall transform a ciphertext block C in
+   {0,1}^n into a plaintext block P in {0,1}^n using the master key
+   K_master.
+
+2.3.2.  Initialization
+
+   The initial state shall be set as:
+      X <- C
+
+2.3.3.  Whitening transformation
+
+   X <- X(+)K_post
+   where K_post is the post-whitening key defined in Clause 2.2.
+
+2.3.4.  Inverse round transformation
+
+
+
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 6]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+   Let: K_r denote the round keys, K_(r,0) and K_(r,1) denote the half
+   round keys as defined in Clause 2.2.
+   For r=R,-1 R-2,...,0, the state shall be updated as follows:
+      X <- XWords(X)
+      X <- invSubCells(X)
+      X <- X (+) K_r,1
+      X <- invMixWords(X)
+      X <- invSubCells(X)
+      X <- X (+) K_r,0
+
+2.3.5.  Output
+
+   The ciphertext shall be defined as:
+      P <- X
+
+2.4.  Basic transformations
+
+   The MKV block cipher shall use the following basic
+   transformations:
+      SubCells invSubCells MixWords invMixWords XWords
+
+   These transformations shall operate on the internal state X in {0,
+   1}^n and
+      are defined in the following subclauses.
+
+2.4.1.  SubCells transformation
+
+   The SubCells transformation shall apply a nonlinear substitution to
+   each byte of the state X.
+   Let the state be represented as:
+      X_i=(x_(i,j) ),  0<=i<4, 0<=j<t
+   where each x_(i,j) in {0,1}^8.
+   The SubCells transformation shall be defined as:
+      x_(i,j) <- S(x_(i,j))
+   for all i, j , where S is a fixed 8-bit substitution box (S-box).
+   The S-box S shall be specified as a lookup table mapping 8-bit input
+   values to 8-bit output values.
+   The lookup shall be performed as follows:
+      the input byte shall be interpreted as a hexadecimal value ab,
+      where:
+         a is the most significant 4 bits (high nibble),
+         b is the least significant 4 bits (low nibble);
+   the output value shall be obtained from the entry at row a and column
+   b of the S-box table.
+   The S-box values shall be specified in Table 1.
+
+   Table 1.  The tabular representation of the substitution box S
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 7]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+      01, 11, 91, E1, D1, B1, 71, 61, F1, 21, C1, 51, A1, 41, 31, 81
+      00, 10, E3, 92, B5, D4, 77, 66, 89, 38, AB, 4A, CD, 5C, 2F, FE
+      08, 5F, 3E, B0, 1C, C2, 83, DD, E8, F6, 47, 79, 95, 2B, AA, 64
+      0F, 48, D0, 29, A3, 1A, F2, BB, 65, CC, E4, 3D, 57, 7E, 86, 9F
+      0C, 2A, F4, 1F, 5B, 90, EE, C5, 36, 6D, 73, 88, BC, A7, 49, D2
+      0A, 3C, 18, 85, E0, 4D, 99, A4, B3, 5E, DA, C7, 72, FF, 6B, 26
+      06, 76, CF, A8, 4E, 59, 60, 17, DC, 9B, 32, F5, 23, 84, ED, BA
+      07, 67, 2D, 3B, FA, 8C, 16, 70, 54, A2, 98, BE, EF, D9, C3, 45
+      0E, A9, 62, 5A, 27, BF, 34, 9C, FD, D5, 8E, E6, 1B, 43, 78, C0
+      03, B2, 87, C4, 9D, 6E, 4B, F8, 7A, E9, 2C, AF, D6, 15, 50, 33
+      0D, FB, 56, EC, 3F, 75, B8, 42, 1E, 24, C9, 93, 80, 6A, D7, AD
+      04, E5, B9, 7D, 82, A6, CA, 2E, 97, 13, 6F, DB, 44, 30, FC, 58
+      0B, 8D, 9A, 46, 74, 28, DF, 53, CB, B7, F0, 6C, AE, E2, 35, 19
+      05, 94, 7B, DE, C6, F3, AC, 39, 4F, 8A, 55, 20, 68, BD, 12, E7
+      02, D3, A5, F7, 69, EB, 5D, 8F, 22, 40, B6, 14, 3A, C8, 9E, 7C
+      09, CE, 4C, 63, D8, 37, 25, EA, A0, 7F, 1D, 52, F9, 96, B4, 8B
+
+2.4.2.  invSubCells transformation
+
+   The invSubCells transformation shall apply the inverse
+   substitution
+      box S^{-1} to each byte of the state.  The transformation shall be
+      defined as: x_(i,j) in S^(-1) (x_(i,j))
+
+   for all i,j.
+      The inverse S-box S^(-1) shall be specified as a lookup table in
+      Table 2.
+
+   Table 2.  The tabular representation of the substitution box
+   S^(-1)
+
+      10, 00, E0, 90, B0, D0, 60, 70, 20, F0, 50, C0, 40, A0, 80, 30
+      11, 01, DE, B9, EB, 9D, 76, 67, 52, CF, 35, 8C, 24, FA, A8, 43
+      DB, 09, E8, 6C, A9, F6, 5F, 84, C5, 33, 41, 2D, 9A, 72, B7, 1E
+      BD, 0E, 6A, 9F, 86, CE, 48, F5, 19, D7, EC, 73, 51, 3B, 22, A4
+      E9, 0D, A7, 8D, BC, 7F, C3, 2A, 31, 4E, 1B, 96, F2, 55, 64, D8
+      9E, 0B, FB, C7, 78, DA, A2, 3C, BF, 65, 83, 44, 1D, E6, 59, 21
+      66, 07, 82, F3, 2F, 38, 17, 71, DC, E4, AD, 5E, CB, 49, 95, BA
+      77, 06, 5C, 4A, C4, A5, 61, 16, 8E, 2B, 98, D2, EF, B3, 3D, F9
+      AC, 0F, B4, 26, 6D, 53, 3E, 92, 4B, 18, D9, FF, 75, C1, 8A, E7
+      45, 02, 13, AB, D1, 2C, FD, B8, 7A, 56, C2, 69, 87, 94, EE, 3F
+      F8, 0C, 79, 34, 57, E2, B5, 4D, 63, 81, 2E, 1A, D6, AF, CC, 9B
+      23, 05, 91, 58, FE, 14, EA, C9, A6, B2, 6F, 37, 4C, DD, 7B, 85
+      8F, 0A, 25, 7E, 93, 47, D4, 5B, ED, AA, B6, C8, 39, 1C, F1, 62
+      32, 04, 4F, E1, 15, 89, 9C, AE, F4, 7D, 5A, BB, 68, 27, D3, C6
+      54, 03, CD, 12, 3A, B1, 8B, DF, 28, 99, F7, E5, A3, 6E, 46, 7C
+      CA, 08, 36, D5, 42, 6B, 29, E3, 97, FC, 74, A1, BE, 88, 1F, 5D
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 8]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+2.4.3.  MixWords transformation
+
+   The MixWords transformation shall be a linear transformation applied
+   independently to each sub-state of the state X.
+
+   2.4.3.1 Rotation step
+
+Let the input state be:
+   X=(X_0,X_1,X_2,X_3)
+where each sub-state X_i in {0,1}^w.
+Each sub-state shall first be rotated to the left by a sub-state-
+dependent offset:
+   Z_i=RotL(X_i, i(.)w/4)
+for i=0,1,2,3,
+where:
+   RotL(x,r) denotes cyclic left rotation of the bit string x by r bits.
+
+   2.4.3.2 Linear transformation over GF(2^8)
+
+   Each rotated sub-state Z_i ? shall be interpreted as a vector of bytes:
+      Z_i  = (z_(i,0), z_(i,1), ..., z_(i,t-1))
+   where:
+      z_(i,j) in GF(2^8)
+      t=w/8
+   The output sub-state Y_i ? shall be computed as:
+      Y_i  = M(.)Z_i
+   where:
+      M in GF(2^8)^(t×t) is a fixed matrix
+      multiplication is performed over GF(2^8)
+
+   2.4.3.3 Component-wise definition
+
+   The transformation shall be defined component-wise as:
+      y_(i,j)  = Sum_(k=0)^(t-1) (m_(j,k)(.)z_(i,k))
+   for: 0<=i<4,0<=j<t
+where:
+        m_(j,k) in GF(2^8)
+       addition and multiplication are performed in GF(2^8)
+
+   2.4.3.4 Matrix specification
+
+   For MKV-128, the matrix M shall be defined as:
+      M_4=(
+         0x01&0x02&0x01&0x03
+         0x03&0x07&0x01&0x04
+         0x04&0x0B&0x03&0x0C
+         0x0C&0x1E&0x06&0x14)
+   The result of the multiplication Y^i=M_4 Z^i  (0<=i<4) is determined
+
+
+
+Cuong & Truong           Expires 7 January 2027                 [Page 9]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+   as follows:
+      M_4=(
+         y_0^i=0x01?z_0^i?0x02?z_1^i?0x01?z_2^i?0x03?z_3^i
+         y_1^i=0x03?z_0^i?0x07?z_1^i?0x01?z_2^i?0x04?z_3^i
+         y_2^i=0x04?z_0^i?0x0B?z_1^i?0x03?z_2^i?0x0D?z_3^i
+         y_3^i=0x0D?z_0^i?0x1E?z_1^i?0x06?z_2^i?0x14?z_3^i )
+   For MKV-256, the matrix M shall be defined as:
+      M_8=(
+         "0x01" &"0x04" &"0xDB" &"0x0C" &"0x14" &"0x0C" &"0xDB" &"0x04"
+         "0x04" &"0x11" &"0x15" &"0xEB" &"0x5C" &"0x24" &"0x1D" &"0xCB"
+         "0xCB" &"0x55" &"0x38" &"0xE6" &"0xD5" &"0xAF" &"0x0D" &"0x4C"
+         "0x4C" &"0xD0" &"0x5D" &"0x15" &"0x91" &"0xF8" &"0xA7" &"0x16"
+         "0x16" &"0x14" &"0x18" &"0xB5" &"0x06" &"0x79" &"0x30" &"0xFF"
+         "0xFF" &"0x97" &"0xE0" &"0xB0" &"0x66" &"0xAE" &"0x8D" &"0xB1"
+         "0xB1" &"0x6D" &"0xF6" &"0x7D" &"0x3C" &"0xFB" &"0xCF" &"0x1F"
+         "0x1F" &"0xCD" &"0x5C" &"0x72" &"0xDA" &"0xB8" &"0xCA" &"0xB3" ))
+   The result of the multiplication Y^i=M_8 z^i  (0?i<8) is determined as follows:
+      y_0^i=0x01?z_0^i?0x04?z_1^i?0xDB?z_2^i?0x0C?z_3^i?0x14?z_4^i?0x0C?
+             z_5^i?0xDB?z_6^i?0x04?z_7^i
+      y_1^i=0x04?z_0^i?0x11?z_1^i?0x15?z_2^i?0xEB?z_3^i?0x5C?z_4^i?0x24?
+             z_5^i?0x1D?z_6^i?0xCB?z_7^i
+      y_2^i=0xCB?z_0^i?0x55?z_1^i?0x38?z_2^i?0xE6?z_3^i?0xD5?z_4^i?0xAF?
+             z_5^i?0x0D?z_6^i?0x4C?z_7^i
+      y_3^i=0x4C?z_0^i?0xD0?z_1^i?0x5D?z_2^i?0x15?z_3^i?0x91?z_4^i?0xF8?
+             z_5^i?0xA7?z_6^i?0x16?z_7^i
+      y_4^i=0x16?z_0^i?0x14?z_1^i?0x18?z_2^i?0xB5?z_3^i?0x06?z_4^i?0x79?
+             z_5^i?0x30?z_6^i?0xFF?z_7^i
+      y_5^i=0xFF?z_0^i?0x97?z_1^i?0xE0?z_2^i?0xB0?z_3^i?0x66?z_4^i?0xAE?
+             z_5^i?0x8D?z_6^i?0xB1?z_7^i
+      y_6^i=0xB1?z_0^i?0x6D?z_1^i?0xF6?z_2^i?0x7D?z_3^i?0x3C?z_4^i?0xFB?
+             z_5^i?0xCF?z_6^i?0x1F?z_7^i
+      y_7^i=0x1F?z_0^i?0xCD?z_1^i?0x5C?z_2^i?0x72?z_3^i?0xDA?z_4^i?0xB8?
+             z_5^i?0xCA?z_6^i?0xB3?z_7^i )
+
+2.4.4.  invMixWords transformation
+
+   The invMixWords transformation shall be the inverse of the MixWords
+   transformation defined in Clause 2.4.3.  The transformation shall be
+   applied independently to each sub-state of the state.
+
+   a) Inverse linear transformation
+
+   Let the input state be:
+      X=(X_0,X_1,X_2,X_3)
+   Each sub-state X_i shall be interpreted as a vector of bytes:
+      X_i=(x_(i,0),x_(i,1),...,x_(i,t-1))
+   The intermediate sub-state Z_i shall be computed as:
+      Z_i=M^(-1)(.)X_i
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 10]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+   where:
+        M^(-1) in GF(2^8 )^(t×t) is the inverse of the matrix M defined
+                in Clause 2.4.3
+   all operations are performed in GF(2^8)
+   For MKV-128, the inverse matrix M^(-1) shall be defined as:
+      M^(-1)=(
+         0x14&0x06&0x18&0x0B
+         0x0B&0x02&0x0D&0x05
+         0x05&0x01&0x07&0x02
+         0x02&0x01&0x03&0x01))
+   The result of the multiplication z^i=M_4^(-1) x^i  (0<=i<4) is
+   determined as follows:
+      z_0^i=0x14?x_0^i?0x06?x_1^i?0x18?x_2^i?0x0B?x_3^i
+      z_1^i=0x0B?x_0^i?0x02?x_1^i?0x0D?x_2^i?0x05?x_3^i
+      z_2^i=0x05?x_0^i?0x01?x_1^i?0x07?x_2^i?0x02?x_3^i
+      z_3^i=0x02?x_0^i?0x01?x_1^i?0x03?x_2^i?0x01?x_3^i )
+   For MKV-256, the inverse matrix M^(-1) shall be defined as:
+      M_8^(-1)=(
+         "0xB3" &"0xCA" &"0xB8" &"0xDA" &"0x72" &"0x5C" &"0xCD" &"0x1F"
+         "0x1F" &"0xCF" &"0xFB" &"0x3C" &"0x7D" &"0xF6" &"0x6D" &"0xB1"
+         "0xB1" &"0x8D" &"0xAE" &"0x66" &"0xB0" &"0xE0" &"0x97" &"0xFF"
+         "0xFF" &"0x30" &"0x79" &"0x06" &"0xB5" &"0x18" &"0x14" &"0x16"
+         "0x16" &"0xA7" &"0xF8" &"0x91" &"0x15" &"0x5D" &"0xD0" &"0x4C"
+         "0x4C" &"0x0D" &"0xAF" &"0xD5" &"0xE6" &"0x38" &"0x55" &"0xCB"
+         "0xCB" &"0x1D" &"0x24" &"0x5C" &"0xEB" &"0x15" &"0x11" &"0x04"
+         "0x04" &"0xDB" &"0x0C" &"0x14" &"0x0C" &"0xDB" &"0x04" &"0x01")
+   The result of the multiplication z^i=M_8^(-1) x^i  (0<=i<8) is
+   determined as follows:
+      z_0^i=0xB3?x_0^i?0xCA?x_1^i?0xB8?x_2^i?0xDA?x_3^i?0x72?x_4^i?0x5C?
+             x_5^i?0xCD?x_6^i?0x1F?x_7^i
+      z_1^i=0x1F?x_0^i?0xCF?x_1^i?0xFB?x_2^i?0x3C?x_3^i?0x7D?x_4^i?0xF6?
+             x_5^i?0x6D?x_6^i?0xB1?x_7^i
+      z_2^i=0xB1?x_0^i?0x8D?x_1^i?0xAE?x_2^i?0x66?x_3^i?0xB0?x_4^i?0xE0?
+             x_5^i?0x97?x_6^i?0xFF?x_7^i
+      z_3^i=0xFF?x_0^i?0x30?x_1^i?0x79?x_2^i?0x06?x_3^i?0xB5?x_4^i?0x18?
+             x_5^i?0x14?x_6^i?0x16?x_7^i
+      z_4^i=0x16?x_0^i?0xA7?x_1^i?0xF8?x_2^i?0x91?x_3^i?0x15?x_4^i?0x5D?
+             x_5^i?0xD0?x_6^i?0x4C?x_7^i
+      z_5^i=0x4C?x_0^i?0x0D?x_1^i?0xAF?x_2^i?0xD5?x_3^i?0xE6?x_4^i?0x38?
+             x_5^i?0x55?x_6^i?0xCB?x_7^i
+      z_6^i=0xCB?x_0^i?0x1D?x_1^i?0x24?x_2^i?0x5C?x_3^i?0xEB?x_4^i?0x15?
+             x_5^i?0x11?x_6^i?0x04?x_7^i
+      z_7^i=0x04?x_0^i?0xDB?x_1^i?0x0C?x_2^i?0x14?x_3^i?0x0C?x_4^i?0xDB?
+             x_5^i?0x04?x_6^i?0x01?x_7^i )
+
+   b) Component-wise definition
+
+   z_(i,j)  = Sum_(k=0)^(t-1) m_(j,k)^(-1)(.)x_(i,k)
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 11]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+      for  0<=i<4,0<=j<t
+
+   c) Inverse rotation
+
+The output sub-state Y_i? shall be obtained by applying the inverse rotation:
+    Y_i=RotR(Z_i,i(.)w/4)
+for i=0,1,2,3,
+where:
+   RotR(x,r) denotes cyclic right rotation of x by r bits
+
+2.4.5.  XWords transformation
+
+   The XWords transformation shall be a linear transformation applied to
+   the state X?{0,1}^n, operating on its four sub-states.
+   Let the input state be:
+      X=(X_0,X_1,X_2,X_3)
+   where each sub-state X_i in {0,1}^w.
+   The output state:
+      Y=(Y_0,Y_1,Y_2,Y_3)
+   shall be computed as follows:
+      Y_0=X_1(+)X_2(+)X_3
+      Y_1=X_0(+)X_2(+)X_3
+      Y_2=X_0(+)X_1(+)X_3
+      Y_3=X_0(+)X_1(+)X_2
+   Note: The XWords transformation shall be self-invertible.
+   That is, the input state X shall be recovered from Y as:
+      X_0=Y_1(+)Y_2(+)Y_3
+      X_1=Y_0(+)Y_2(+)Y_3
+      X_2=Y_0(+)Y_1(+)Y_3
+      X_3=Y_0(+)Y_1(+)Y_2
+
+2.5.  Key schedule process
+
+   a)
+      About key schedule
+
+
+   The key schedule shall derive:
+      round keys K_r in {0,1}^2n, for r=0,1,...,R-1, and a post-
+      whitening key K_post in {0,1}^2n, from the master key K_master.
+      The key schedule shall operate on an internal key state K in
+      {0,1}^2n.
+
+   b)
+      Key state representation
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 12]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+   The key state shall be partitioned into eight words:
+      K = (K_0, K_1, K_2, K_3, K_4, K_5, K_6, K_7)
+   where each K_i in {0,1}^w, with w=n/4.
+   Each word shall be represented as:
+      K_i=(k_(i,0),k_(i,1),...,k_(i,T-1))
+   where:
+      k_(j,k) in {0,1}^8
+      t=w/8
+   The key state shall also be represented as:
+      K^0=(K_0, K_1, K_2, K_3)
+      K^1=(K_4, K_5, K_6, K_7)
+   such that:
+      K=K^0||K^1
+
+   c) Key schedule internal process
+
+The initial key state K shall be derived from K_master as follows:
+   K <- K_master
+During the key schedule proces, round keys are derived from the 2n-bit
+states, double the length of the states in the encryption and
+decryption operations in Sections 2.2 and 2.3. Thus, the key schedule
+state K will be processed into 8 w-bit words k^0,k^1,k^2,k^3,k^4,k^5,
+k^6,k^7 as follows: K=k^0 ... k^7, where k^i are w-bit strings divided
+into t byte of the form k_0^i ...k_(t-1)^i,k_j^i in V_8 for all
+0<=i<8, 0<=j<t.
+This state is represented as a t×8 table with elements having byte
+values. Additionally, each state K will also be represented as two
+sub-states of size n-bit
+   K^0=k^0||k^1||k^2||k^3 in V_n,
+   K^1=k^4||k^5||k^6||k^7 in V_n
+such that K=K^0||K^1 in V_2n.
+The MKV key schedule process updates the 2n-bit key state
+K=K^0||K^1 in V_2n to retrieve round keys from master key K_master.
+First, the initial key state with value K_int is initialized from the
+master key K_master in the case of 2n-bit key, and the additional key
+is added for the other case as follows:
+   K_int={
+          k^0||...||k^7
+         in case K_master=k^0||...||k^7 in V_2n
+      k^0||...||k^4||k^5||(k^2^neg)||(k^3^neg)
+         in case K_master=k^0||...||k^5 in V_(3n/2)
+      k^0||...||k^3||(k^0^neg)||...||(k^3^neg)
+             in case K_master=k^0||...||k^3 in V_n
+this initialization step is denoted by K_int<-K_master.
+
+Next, the round keys K_i, i=0, 1,...,R-1 and K_post are obtained from
+2R+1) n-bit strings RK, which generated during the key states update
+process including basic transformations SubCells, MixWords, XWords in
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 13]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+Clause 2.4 on the sub-states K^0, K^1 combined with XOR addition with
+a round constant of n-bit value depending on Const_l^0, Const_l^1 and
+round indices i and the transformation to swap the values ??of the two
+sub-states denoted as SWAP(K^0,K^1).
+By performing R updates to the keystate K, we obtain the values
+RK_0,RK_1,...,RK_2R. Then, the round keys K_0,...,K_(R-1)in V_2n,
+K_post in V_n that allow encryption and decryption in Clauses 2.2 and
+2.3 will be determined through the n-bit strings RK_0,RK_1,...,RK_2R.
+The key schedule process can be fully described as follows:
+   (1) K=K_int <- K_master
+   (2) RK_0=K^0
+   (3) For i=0 to R-1 do
+      (3.1) K^1=XWord(SubCells(MixWords(SubCells(K^1(+)Const_i^1(+)(2i+2)_n))))
+      (3.2) K^1=XWord(SubCells(MixWords(SubCells(K^1))))
+      (3.3) K^0=XWord(SubCells(MixWords(SubCells(K^0(+)Const_i^0(+)(2i+1)_n))))
+      (3.4) K^0=XWord(SubCells(MixWords(SubCells(K^0 ))))(+)K^1
+      (3.5) SWAP(K^0,K^1)
+      3.6) RK_(2i+1)=K^0
+      (3.7) RK_(2i+2)=K^1
+   (4) For i=0 to R-1 do
+      (4.1) K_i=(K_i^0||K_i^1)=(RK_2i||RK_(2i+1))
+   (5) K_post=RK_2R
+
+   d) Round constants
+
+   For each block size n, the following constants shall be used:
+      For n=128: Const_128^((0)) =0x9302ee911a2ad98cad13e7948ad8b3b2,
+      Const_128^((1)) =0xd4da00f33f11fd8822166bb9cd187c55,
+
+   For n=256:
+      Const_256^((0))
+      =0x9302ee911a2ad98cad13e7948ad8b3b2d4da00f33f11fd8822166bb9cd187c55,
+      Const_256^((1))
+      =0x43c853a3f90f70ae8d72ad0e7aac0c71afad739c17a14bd656c9436300def1e5.
+
+Appendix A.  Test vector for MKV
+
+A.1.  MKV with 128-bit block size
+
+   A.1.1.  Master Key of length 128 bits:
+
+   Plaintext: 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00 Masterkey:
+   01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 11
+
+   Round keys obtained through key schedule:
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 14]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+K_0^0:                  01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 11
+K_0^1:                       0D 96 E3 D1 96 32 6A C6 83 15 EF 29 34 37 AB 0A
+K_1^0:                       05 6F 4B 9A 95 33 CA 5B 6D DC 9B 6A 7E CE 62 A7
+K_1^1:                       D6 26 AD 46 28 C7 1B B9 14 E5 A9 5B 4B 64 40 E1
+K_2^0:                       BB BE 38 EF FA E9 03 80 B8 B8 9E B0 0A B5 93 42
+K_2^1:                       6C B1 7B 9E 1F 7C C4 AF 12 3B 73 D3 E4 36 13 CF
+K_3^0:                       AE BF 06 AC 43 F1 15 1E A1 F4 E5 27 DB 99 69 FD
+K_3^1:                       1A 6D 25 63 A6 32 39 02 94 D0 C6 23 61 6B A9 CC
+K_4^0:                       B9 E5 40 FC F1 0F 0D E0 CF F7 D7 02 0D 64 DF 79
+K_4^1:                       3E 45 29 0E F0 47 E0 B7 C2 C0 6D 48 56 FB 76 74
+K_5^0:                       BA 7F 68 9F 56 12 F6 C4 49 98 27 AB 9A 63 FE 29
+K_5^1:                       2B 4D FA 61 28 CC 1D 7E A8 BA 0C E2 FE DC F7 AE
+K_6^0:                       5B 40 A6 BF 12 50 B1 E8 9A 89 4F 39 F4 F4 5B 9D
+K_6^1:                       10 6C 25 67 A7 43 EE 1E 9E 32 0F BD BD EB 47 4E
+K_post:                      F5 83 77 1B 15 ED D4 76 67 B6 07 29 E4 81 32 C4
+
+The 128-bit state updated round by round:
+
+Round 1
+1.AddRKey K_0^0:     10 20 30 40 50 60 70 80 90 A0 B0 C0 D0 E0 F0 11
+2.SubCells:          00 08 0F 0C 0A 06 07 0E 03 0D 04 0B 05 02 09 10
+3.MixWords:          0B 07 15 22 13 33 5D FC 00 0E 00 05 38 48 C9 58
+4.AddRKey K_0^1:     06 91 F6 F3 85 01 37 3A 83 1B EF 2C 0C 7F 62 52
+5.SubCells:          71 B2 25 63 BF 11 BB E4 5A 4A 7C 95 A1 45 CF 18
+6.XWords:            44 1E 08 69 8A BD 96 EE 6F E6 51 9F 94 E9 E2 12
+
+Ciphertext: B3 31 22 83 34 C3 F8 1A 37 20 65 91 49 87 56 A1
+
+   A.1.2.  Master Key of length 192 bits
+
+   Plaintext: 11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00
+      Masterkey: 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 11 12 13
+      14 15 16 17 18 19
+
+   Ciphertext: A1 34 C7 86 F6 E7 74 85 43 3B 2D 7C AA FD 7A 97
+
+   A.1.3.  Master Key of length 256 bits
+
+   Plaintext:  11 22 33 44 55 66 77 88 99 AA BB CC DD EE FF 00
+
+      Masterkey: 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F 11 12 13
+      14 15 16 17 18 19 1A 1B 1C 1D 1E 1F 22 23
+
+   Ciphertext: 8A 6F 9B BC 74 5B FE E7 00 5F 04 05 4D D1 FF 8E
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 15]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+A.2.  MKV with 256-bit block size
+
+   A.2.1.  Master Key of length 256 bits
+
+   Plaintext:
+   112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00
+   Masterkey:
+   0102030405060708090A0B0C0D0E0F1112131415161718191A1B1C1D1E1F2223
+
+   Ciphertext:
+   3E6359590DC566D8E79629607D5872A6A7C9ADF74BF0D2DF00EAF76FF7C129C3
+
+   A.2.2.  Master Key of length 384 bits
+
+   Plaintext:
+   112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00
+       Masterkey:
+       0102030405060708090A0B0C0D0E0F1112131415161718191A1B1C1D1E1F2223
+       0102030405060708090A0B0C0D0E0F11
+
+   Ciphertext:
+   515D487A2CC34D8A68BEFF4371BE4DF4AAF458B4AB540F394F72747BD9D9DFDB
+
+   A.2.3.  Master Key of length 512 bits
+
+   Plaintext:
+   112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF00
+       Masterkey:
+       0102030405060708090A0B0C0D0E0F1112131415161718191A1B1C1D1E1F2223
+       0102030405060708090A0B0C0D0E0F1112131415161718191A1B1C1D1E1F2223
+
+   Ciphertext:
+   5E6FD5F88B7924E0E24F070C8E3F3FBC264350BF06A169F55167C51521B7CFA4
+
+Appendix B.  Bibliography.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 16]
+
+Internet-Draft  Encryption algorithms - Block cipher MKV       July 2026
+
+
+  [1] Tieu chuan quoc gia TCVN 11367-1:2016: Cong nghe thong tin -
+  Cac ky thuat an toan - Thuat toan mat ma - Ma khoi MKV
+  [2] Cuong Nguyen, Anh Nguyen, Phong Trieu, Long Nguyen, and Lai
+  Tran. Analysis of a new practically secure SPN-based scheme in the
+  Luby-Rackoff model. in The 9th International Conference on Future Data
+  and Security Engineering. 2022. Springer.
+  [3] Cuong Nguyen, Nam Tran, and Long Nguyen. FLC: A New Secure
+  and Efficient SPN-Based Scheme for Block Ciphers. in 2022 9th NAFOSTED
+  Conference on Information and Computer Science (NICS). 2022. IEEE.
+  [4] Tran Sy Nam, Nguyen Van Long, and Nguyen Bui Cuong. An Optimized
+  Bit-Slice Implementation of Secure 8-Bit Sbox Based on Butterfly
+  Structure. 15th International Conference on Knowledge and Systems
+  Engineering (KSE). 2023. IEEE.
+  [5] Bui Cuong Nguyen and Tuan Anh Nguyen, Evaluating pseudorandomness
+  and superpseudorandomness of the iterative scheme to build SPN block
+  cipher. Journal of Science and Technology on Information security,
+  2017. 40(2): p. 40.
+  [6] Tran Sy Nam, Nguyen Van Long and Nguyen Bui Cuong, Xay dung tang
+  tuyen tinh co cai dat hieu qua cho ma khoi 128-bit co cau truc FLC,
+  Hoi thao nghien cuu ung dung mat ma va an toan thong tin, Hoc vien
+  Ky thuat mat ma, Ha noi 2002
+  [7] Tran Sy Nam, Nguyen Van Long and Nguyen Bui Cuong, De xuat tang
+  tuyen tinh va danh gia kha nang cai dat trong xay dung ma khoi 256-bit
+  co cau truc FLC. Tap chi Khoa hoc va Cong nghe trong linh vuc an toan
+  thong tin, 2(16) 2023, 31-38. https://doi.org/10.54654/isj.v1i16.920.
+
+
+Authors' Addresses
+
+   Nguyen Bui Cuong
+   Vietnam Government Information Security Commission
+   105 Nguyen Chi Thanh
+   Hanoi
+   Vietnam
+   Email: nguyenbuicuong@gmail.com
+
+
+   Dang Van Truong
+   Vietnam Government Information Security Commission
+   105 Nguyen Chi Thanh
+   Hanoi
+   Vietnam
+   Email: dv_truong@yahoo.com
+
+
+
+
+
+
+
+
+Cuong & Truong           Expires 7 January 2027                [Page 17]

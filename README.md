@@ -98,6 +98,7 @@ run pinned with `taskset -c 3`. GCC 16.2.1, OpenSSL 4.1.0, six trials per case
 with at least 35 ms per trial, seed 14263. These figures measure the listed
 software and hardware configuration.
 
-MKV is specified in [TCVN 14263:2024](https://tieuchuan.vsqi.gov.vn/tieuchuan/view?sohieu=TCVN+14263%3A2024).
-The GCM construction follows [NIST SP 800-38D](https://csrc.nist.gov/pubs/sp/800/38/d/final).
-Source is available under the [MIT License](LICENSE).
+See [public references](docs/README.md) for the MKV Internet-Draft, the
+Math-Net design paper, the Vietnamese standard and the GCM specification.
+
+Project source is available under the [MIT License](LICENSE).
