@@ -106,10 +106,11 @@ void run_case(std::size_t size, bool opening, unsigned rounds, int milliseconds,
     for (std::size_t i = 0; i < size; ++i)
         input[i] = static_cast<Byte>(7 + 13 * i);
     std::vector<Candidate> candidates;
-    for (auto cipher : {Cipher::scalar, Cipher::ssse3, Cipher::avx2, Cipher::avx2_prefix}) {
+    for (auto cipher : {Cipher::scalar, Cipher::ssse3, Cipher::avx2, Cipher::avx2_prefix,
+                        Cipher::gfni, Cipher::vbmi}) {
         if (!available(cipher))
             continue;
-        for (auto hash : {Hash::scalar, Hash::pclmul}) {
+        for (auto hash : {Hash::scalar, Hash::pclmul, Hash::vpclmul}) {
             if (!available(hash))
                 continue;
             auto gcm = std::make_shared<Gcm>(key, cipher, hash);
@@ -198,7 +199,7 @@ int main(int argc, char** argv) try {
     constexpr int milliseconds = 35;
     std::mt19937 random(seed);
     std::vector<std::pair<std::size_t, bool>> cases;
-    for (auto size : {64u, 1024u, 16384u, 262144u}) {
+    for (auto size : {64u, 511u, 512u, 1024u, 1200u, 16384u, 262144u}) {
         cases.emplace_back(size, false);
         cases.emplace_back(size, true);
     }

@@ -4,9 +4,9 @@
 #include <vector>
 
 int main() {
-    for (auto cipher :
-         {mkv::Cipher::scalar, mkv::Cipher::ssse3, mkv::Cipher::avx2, mkv::Cipher::avx2_prefix})
-        for (auto hash : {mkv::Hash::scalar, mkv::Hash::pclmul}) {
+    for (auto cipher : {mkv::Cipher::scalar, mkv::Cipher::ssse3, mkv::Cipher::avx2,
+                        mkv::Cipher::avx2_prefix, mkv::Cipher::gfni, mkv::Cipher::vbmi})
+        for (auto hash : {mkv::Hash::scalar, mkv::Hash::pclmul, mkv::Hash::vpclmul}) {
             if (!mkv::available(cipher) || !mkv::available(hash))
                 continue;
             std::fprintf(stderr, "Checking %s + %s\n", mkv::name(cipher), mkv::name(hash));

@@ -11,8 +11,8 @@ using Key = std::array<Byte, 32>;
 using Nonce = std::array<Byte, 12>;
 using Tag = std::array<Byte, 16>;
 
-enum class Cipher { automatic, scalar, ssse3, avx2, avx2_prefix };
-enum class Hash { automatic, scalar, pclmul };
+enum class Cipher { automatic, scalar, ssse3, avx2, avx2_prefix, gfni, vbmi };
+enum class Hash { automatic, scalar, pclmul, vpclmul };
 
 bool available(Cipher cipher) noexcept;
 bool available(Hash hash) noexcept;
@@ -47,14 +47,14 @@ class Gcm {
     Cipher cipher_;
     Hash hash_;
     using Block = Tag (*)(const Tag*, Tag) noexcept;
-    using Bulk = void (*)(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*) noexcept;
+    using Bulk = void (*)(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*,
+                          const Byte*) noexcept;
     using Update = void (*)(Tag&, const Tag*, const Byte*, std::size_t) noexcept;
     Block block_;
     Bulk bulk_;
     Update update_;
 
-    Tag authenticate(const Nonce&, const Byte*, std::size_t, const Byte*,
-                     std::size_t) const noexcept;
-    void ctr(const Nonce&, const Byte*, Byte*, std::size_t) const noexcept;
+    Tag authenticate(const Byte*, std::size_t, const Byte*, std::size_t) const noexcept;
+    void ctr(const Nonce&, const Byte*, Byte*, std::size_t, Tag* tag_mask = nullptr) const noexcept;
 };
 } // namespace mkv

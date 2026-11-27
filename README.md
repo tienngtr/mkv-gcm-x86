@@ -8,18 +8,25 @@ was used for local cross-checks.
 
 | Component | Minimum hardware | Implementation |
 |---|---|---|
-| Scalar MKV and GHASH | Baseline x86-64 | Masked GF(16) S-box arithmetic and bit-serial GHASH |
-| SSSE3 MKV | SSSE3 | One block using fixed-address constants and register shuffles |
-| AVX2 MKV | SSSE3, AVX2 and OS support for YMM state | 32 counter blocks in byte planes, with an SSSE3 tail |
-| AVX2 MKV with prefix caching | Same as AVX2 MKV | Shares the first two rounds' invariant word work across full batches |
-| PCLMUL GHASH | PCLMULQDQ | Four-block folding with precomputed powers of H |
+| Scalar MKV and GHASH | Baseline x86-64 | Masked GF(16) S-box arithmetic and two-limb bit-serial GHASH |
+| `Cipher::ssse3` | SSSE3 | Single-block and 16-block CTR kernels with register shuffles and prefix caching for batches |
+| `Cipher::avx2` | SSSE3, AVX2, OS support for YMM state | 32-block CTR kernel, with SSSE3 for short packets and tails |
+| `Cipher::avx2_prefix` | Same as `Cipher::avx2` | Adds shared word transformations for the fixed 96-bit counter prefix |
+| `Cipher::gfni` | SSSE3, AVX2, GFNI, OS support for YMM state | 32-block cached CTR using GFNI for the S-box and MixWords |
+| `Cipher::vbmi` | SSSE3, AVX2, GFNI, AVX-512F, AVX-512BW, AVX-512VBMI, OS support for ZMM and opmask state | 64-block cached CTR with the S-box held in four registers and GFNI for MixWords. Smaller batches use the GFNI and SSSE3 kernels |
+| `Hash::pclmul` | PCLMULQDQ | Four-block folding with precomputed powers of H |
+| `Hash::vpclmul` | AVX2, VPCLMULQDQ, PCLMULQDQ, OS support for YMM state | Two parallel 128-bit lanes for four-block folding. Short updates use PCLMULQDQ |
 
-Cipher and hash dispatch independently. The AVX2 prefix path prepares its
-cache once per record containing at least 32 data blocks. Three word
-transformations in the first MKV round and one in the second depend only on
-the fixed 96-bit counter prefix for that record. GHASH uses the same path
-whether or not the cipher caches those values. All backends use one caller
-thread.
+Cipher and hash dispatch independently. Automatic selection prefers
+`Cipher::avx2_prefix` and `Hash::vpclmul` when available. GFNI and VBMI can
+be selected explicitly. They passed tests under emulation and still need
+real-hardware performance measurements.
+
+A cached CTR batch reuses three nonce-dependent word transformations in its
+first round pair and one in its second. Full batches XOR data while writing
+blocks out of the SIMD registers. Sealing can compute the tag mask from a
+spare counter lane. Opening authenticates the ciphertext before starting CTR
+decryption. All backends use one caller thread.
 
 ## Use as a library
 
@@ -56,11 +63,19 @@ find_package(mkv_gcm 0.1 CONFIG REQUIRED)
 target_link_libraries(my_app PRIVATE mkv::gcm)
 ```
 
-With another build system, compile the five `src/*.cpp` files as separate C++17
-translation units and expose the `include/` directory. Use baseline
-`-march=x86-64` and add `-mssse3` only to `ssse3.cpp`, `-mavx2` only to
-`avx2.cpp`, and `-mpclmul` only to `pclmul.cpp` so runtime dispatch can select
-the available instructions. OpenSSL is used by the optional benchmark.
+With another build system, compile the `src/*.cpp` files as separate C++17
+translation units and expose the `include/` directory. Use `-march=x86-64`
+for every source file and add the following flags by file to preserve runtime
+dispatch. OpenSSL is used by the optional benchmark.
+
+| Source file | Additional flags |
+|---|---|
+| `ssse3.cpp` | `-mssse3` |
+| `avx2.cpp` | `-mavx2` |
+| `gfni.cpp` | `-mavx2 -mgfni` |
+| `vbmi.cpp` | `-mavx512f -mavx512bw -mavx512vbmi -mgfni` |
+| `pclmul.cpp` | `-mpclmul` |
+| `vpclmul.cpp` | `-mavx2 -mpclmul -mvpclmulqdq` |
 
 To build and run the standalone tests, enable `BUILD_TESTING`.
 
@@ -96,13 +111,16 @@ uses fixed-work masks or carryless multiplication. Tag verification checks
 all 16 bytes before branching on authentication success.
 
 The tests cover a block known-answer vector, reference-generated AEAD
-fixtures, in-place operation, counter carries, batch tails, invalid lengths
-and rejection of altered ciphertext and tags. A separate local differential
-run compared eight cipher/hash combinations against libmkvpp for 80 records.
-The fallback ran under QEMU with SSSE3 and PCLMULQDQ disabled.
+fixtures, counter carries, unaligned buffers, batch boundaries, invalid lengths
+and rejection of altered ciphertext and tags. They check that successful
+in-place opening recovers the plaintext and that failed authentication leaves
+the output untouched. Baseline and SSSE3 ran under QEMU. GFNI and VBMI ran under
+[Intel SDE](https://www.intel.com/content/www/us/en/download/684897/intel-software-development-emulator.html).
 
 The optional Memcheck probe checks key expansion and sealing for secret-dependent
-branches or addresses in each available backend. In the example below, static
+branches or addresses in backends supported by Memcheck’s CPU emulation.
+Local SDE trace comparisons checked instruction and memory-address sequences
+across different keys and data on the GFNI, VBMI and VPCLMUL paths. Static
 linking lets Valgrind run on Linux systems with stripped loader symbols.
 
 ```sh
@@ -119,11 +137,13 @@ and does not establish constant timing across every processor or build.
 
 Install the OpenSSL development headers to enable the optional benchmark.
 It compares all supported cipher/hash pairs with OpenSSL AES-256-GCM, for
-64 B, 1 KiB, 16 KiB and 256 KiB records. Each randomized trial order is paired
-with its reverse. The program records the seed on stderr and emits medians
-and individual trial times as CSV on stdout. Key setup stays outside the
-timed interval. Timed sealing includes nonce increments and AVX2 per-record
-prefix preparation. Timed opening includes tag verification.
+64 B, 511 B, 512 B, 1 KiB, 1,200 B, 16 KiB and 256 KiB records. Each randomized
+trial order is paired with its reverse. The program records the seed on stderr
+and emits medians and individual trial times as CSV on stdout. Key setup stays
+outside the timed interval. Timed sealing includes nonce increments and
+per-record CTR prefix preparation. Timed opening includes tag verification.
+The OpenSSL benchmark uses EVP's usual streaming decrypt API and discards the
+output buffer if verification fails.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMKV_BUILD_BENCHMARK=ON

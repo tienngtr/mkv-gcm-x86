@@ -9,7 +9,8 @@ if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$"
 endif()
 
 add_library(mkv_gcm STATIC
-  src/gcm.cpp src/scalar.cpp src/ssse3.cpp src/avx2.cpp src/pclmul.cpp)
+  src/gcm.cpp src/scalar.cpp src/ssse3.cpp src/avx2.cpp
+  src/gfni.cpp src/vbmi.cpp src/pclmul.cpp src/vpclmul.cpp)
 add_library(mkv::gcm ALIAS mkv_gcm)
 target_include_directories(mkv_gcm PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
@@ -22,7 +23,12 @@ set_target_properties(mkv_gcm PROPERTIES
   POSITION_INDEPENDENT_CODE ON)
 set_source_files_properties(src/ssse3.cpp PROPERTIES COMPILE_OPTIONS "-mssse3")
 set_source_files_properties(src/avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2")
+set_source_files_properties(src/gfni.cpp PROPERTIES COMPILE_OPTIONS "-mavx2;-mgfni")
+set_source_files_properties(src/vbmi.cpp PROPERTIES
+  COMPILE_OPTIONS "-mavx512f;-mavx512bw;-mavx512vbmi;-mgfni")
 set_source_files_properties(src/pclmul.cpp PROPERTIES COMPILE_OPTIONS "-mpclmul")
+set_source_files_properties(src/vpclmul.cpp PROPERTIES
+  COMPILE_OPTIONS "-mavx2;-mpclmul;-mvpclmulqdq")
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   set(mkv_gcm_standalone ON)

@@ -1,5 +1,6 @@
 #include "internal.hpp"
 #include <algorithm>
+#include <cstring>
 
 namespace mkv::detail {
 namespace {
@@ -70,28 +71,47 @@ void expand(const Key& key, Tag* schedule, Tag (*double_round)(const Tag*, Tag) 
     schedule[18] = first;
 }
 
-// NIST's bit ordering. The multiplier and reduction use fixed work and masks.
+namespace {
+std::uint64_t load_be(const Byte* bytes) noexcept {
+    std::uint64_t limb;
+    std::memcpy(&limb, bytes, sizeof(limb));
+    return __builtin_bswap64(limb);
+}
+
+void store_be(Byte* bytes, std::uint64_t limb) noexcept {
+    limb = __builtin_bswap64(limb);
+    std::memcpy(bytes, &limb, sizeof(limb));
+}
+} // namespace
+
+// NIST bit ordering, with the polynomial and accumulator in two 64-bit limbs.
 void scalar_hash(Tag& value, const Tag* h, const Byte* data, std::size_t blocks) noexcept {
+    auto hi = load_be(value.data());
+    auto lo = load_be(value.data() + 8);
+    const auto h_hi = load_be(h[0].data());
+    const auto h_lo = load_be(h[0].data() + 8);
     while (blocks--) {
-        Tag product{};
-        Tag polynomial = h[0];
-        for (unsigned i = 0; i < 16; ++i) {
-            unsigned bits = value[i] ^ data[i];
-            for (unsigned bit = 0; bit < 8; ++bit) {
-                unsigned mask = 0u - ((bits >> (7 - bit)) & 1u);
-                // Clang can otherwise turn the masked XOR into a conditional
-                // update. Keep the all-zero/all-one mask opaque to optimization.
+        const auto x_hi = hi ^ load_be(data);
+        const auto x_lo = lo ^ load_be(data + 8);
+        auto v_hi = h_hi;
+        auto v_lo = h_lo;
+        hi = lo = 0;
+        for (auto bits : {x_hi, x_lo}) {
+            for (unsigned i = 0; i < 64; ++i) {
+                auto mask = std::uint64_t{0} - (bits >> 63);
+                // Keep Clang from converting the masked XOR to a branch.
                 asm("" : "+r"(mask));
-                unsigned carry = 0xe1u & (0u - (polynomial[15] & 1u));
-                for (unsigned j = 0; j < 16; ++j)
-                    product[j] ^= polynomial[j] & mask;
-                for (unsigned j = 15; j > 0; --j)
-                    polynomial[j] = (polynomial[j] >> 1) | (polynomial[j - 1] << 7);
-                polynomial[0] = (polynomial[0] >> 1) ^ carry;
+                hi ^= v_hi & mask;
+                lo ^= v_lo & mask;
+                const auto carry = std::uint64_t{0} - (v_lo & 1);
+                v_lo = (v_lo >> 1) | (v_hi << 63);
+                v_hi = (v_hi >> 1) ^ (carry & 0xe100000000000000ULL);
+                bits <<= 1;
             }
         }
-        value = product;
         data += 16;
     }
+    store_be(value.data(), hi);
+    store_be(value.data() + 8, lo);
 }
 } // namespace mkv::detail

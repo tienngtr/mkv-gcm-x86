@@ -36,12 +36,30 @@ Tag scalar_twice(const Tag*, Tag) noexcept;
 Tag ssse3_twice(const Tag*, Tag) noexcept;
 Tag scalar_block(const Tag*, Tag) noexcept;
 Tag ssse3_block(const Tag*, Tag) noexcept;
-// Produces 32 consecutive blocks of CTR keystream.
+inline void fold_box_constant(Tag* keys) noexcept {
+    // Both linear layers preserve a uniform byte of 0x01. Absorb the output
+    // offset of each S-box layer in the next key, including final whitening.
+    for (unsigned round = 1; round <= 18; ++round)
+        for (auto& byte : keys[round])
+            byte ^= 1;
+}
+
+// Prefix shared by the cached counter kernels. The counter kernels store
+// keystream if the input is null, or XOR a full tile directly with the input.
 Tag prepare_prefix(const Tag*, const Nonce&) noexcept;
-void avx2_ctr32(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*) noexcept;
-void avx2_prefix_ctr32(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*) noexcept;
+void ssse3_ctr16(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*, const Byte*) noexcept;
+void ssse3_prefix_ctr16(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*,
+                        const Byte*) noexcept;
+void avx2_ctr32(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*, const Byte*) noexcept;
+void avx2_prefix_ctr32(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*,
+                       const Byte*) noexcept;
+void gfni_prefix_ctr32(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*,
+                       const Byte*) noexcept;
+void vbmi_prefix_ctr64(const Tag*, const Nonce&, const Tag&, std::uint32_t, Byte*,
+                       const Byte*) noexcept;
 void scalar_hash(Tag&, const Tag*, const Byte*, std::size_t) noexcept;
 void pclmul_hash(Tag&, const Tag*, const Byte*, std::size_t) noexcept;
+void vpclmul_hash(Tag&, const Tag*, const Byte*, std::size_t) noexcept;
 void pclmul_powers(Tag*) noexcept;
 
 inline Tag xor_block(Tag left, const Tag& right) noexcept {
