@@ -21,13 +21,51 @@ the fixed 96-bit counter prefix for that record. GHASH uses the same path
 whether or not the cipher caches those values. All backends use one caller
 thread.
 
-## Build and use
+## Use as a library
 
 Use CMake 3.20 or later, GCC or Clang, and an x86-64 target. Linux is the tested
-platform. Link the CMake target `mkv::gcm` and include `<mkv/gcm.hpp>`.
+platform. The public API is in `<mkv/gcm.hpp>`. Both integration methods provide
+the `mkv::gcm` static library target, which can also be linked into a shared
+library.
+
+`add_subdirectory` compiles the sources as part of your project. For example,
+put the checkout in `third_party/mkv-gcm-x86` and link your existing target.
+
+```cmake
+add_subdirectory(third_party/mkv-gcm-x86)
+target_link_libraries(my_app PRIVATE mkv::gcm)
+```
+
+Source integration builds the library by default. Parent projects can opt in
+to the benchmark, tests or install rules with `MKV_BUILD_BENCHMARK`,
+`MKV_GCM_BUILD_TESTS` or `MKV_GCM_INSTALL`, respectively.
+
+For an installed package, build and install to a prefix of your choice.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+cmake --build build --parallel
+cmake --install build --prefix /path/to/prefix
+```
+
+Configure your consuming project with `-DCMAKE_PREFIX_PATH=/path/to/prefix`
+and use the installed target.
+
+```cmake
+find_package(mkv_gcm 0.1 CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE mkv::gcm)
+```
+
+With another build system, compile the five `src/*.cpp` files as separate C++17
+translation units and expose the `include/` directory. Use baseline
+`-march=x86-64` and add `-mssse3` only to `ssse3.cpp`, `-mavx2` only to
+`avx2.cpp`, and `-mpclmul` only to `pclmul.cpp` so runtime dispatch can select
+the available instructions. OpenSSL is used by the optional benchmark.
+
+To build and run the standalone tests, enable `BUILD_TESTING`.
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```

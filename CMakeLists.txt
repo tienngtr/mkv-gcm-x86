@@ -11,21 +11,59 @@ endif()
 add_library(mkv_gcm STATIC
   src/gcm.cpp src/scalar.cpp src/ssse3.cpp src/avx2.cpp src/pclmul.cpp)
 add_library(mkv::gcm ALIAS mkv_gcm)
-target_include_directories(mkv_gcm PUBLIC include)
+target_include_directories(mkv_gcm PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 target_compile_features(mkv_gcm PUBLIC cxx_std_17)
 target_compile_options(mkv_gcm PRIVATE -Wall -Wextra -Wpedantic -march=x86-64)
 # Keep the optional instructions out of the baseline dispatch paths.
-set_target_properties(mkv_gcm PROPERTIES INTERPROCEDURAL_OPTIMIZATION OFF)
+set_target_properties(mkv_gcm PROPERTIES
+  EXPORT_NAME gcm
+  INTERPROCEDURAL_OPTIMIZATION OFF
+  POSITION_INDEPENDENT_CODE ON)
 set_source_files_properties(src/ssse3.cpp PROPERTIES COMPILE_OPTIONS "-mssse3")
 set_source_files_properties(src/avx2.cpp PROPERTIES COMPILE_OPTIONS "-mavx2")
 set_source_files_properties(src/pclmul.cpp PROPERTIES COMPILE_OPTIONS "-mpclmul")
 
-include(CTest)
-if(BUILD_TESTING)
+if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+  set(mkv_gcm_standalone ON)
+  include(CTest)
+  set(mkv_gcm_build_tests "${BUILD_TESTING}")
+else()
+  set(mkv_gcm_standalone OFF)
+  option(MKV_GCM_BUILD_TESTS "Build MKV-GCM tests in the parent project" OFF)
+  set(mkv_gcm_build_tests "${MKV_GCM_BUILD_TESTS}")
+endif()
+
+if(mkv_gcm_build_tests)
+  enable_testing()
   add_executable(mkv_tests tests/test.cpp)
   target_include_directories(mkv_tests PRIVATE src)
   target_link_libraries(mkv_tests PRIVATE mkv::gcm)
   add_test(NAME mkv_gcm COMMAND mkv_tests)
+endif()
+
+option(MKV_GCM_INSTALL "Install the MKV-GCM library and CMake package" "${mkv_gcm_standalone}")
+if(MKV_GCM_INSTALL)
+  include(GNUInstallDirs)
+  include(CMakePackageConfigHelpers)
+  target_include_directories(mkv_gcm PUBLIC "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+  set(mkv_gcm_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/mkv_gcm")
+  configure_package_config_file(cmake/mkv_gcmConfig.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/mkv_gcmConfig.cmake"
+    INSTALL_DESTINATION "${mkv_gcm_package_dir}")
+  write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/mkv_gcmConfigVersion.cmake"
+    VERSION "${PROJECT_VERSION}" COMPATIBILITY SameMinorVersion)
+
+  install(TARGETS mkv_gcm EXPORT mkv_gcmTargets
+    ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+  install(FILES include/mkv/gcm.hpp DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/mkv")
+  install(FILES LICENSE DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/mkv_gcm")
+  install(EXPORT mkv_gcmTargets NAMESPACE mkv:: DESTINATION "${mkv_gcm_package_dir}")
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/mkv_gcmConfig.cmake"
+    "${CMAKE_CURRENT_BINARY_DIR}/mkv_gcmConfigVersion.cmake"
+    DESTINATION "${mkv_gcm_package_dir}")
 endif()
 
 option(MKV_BUILD_BENCHMARK "Build the OpenSSL comparison benchmark" OFF)

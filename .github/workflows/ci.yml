@@ -18,3 +18,17 @@ jobs:
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DMKV_BUILD_BENCHMARK=ON
       - run: cmake --build build --parallel
       - run: ctest --test-dir build --output-on-failure
+      - name: Test vendored source integration
+        run: |
+          cmake -S tests/consumer -B build-vendored -DCMAKE_BUILD_TYPE=Release \
+            -DMKV_GCM_SOURCE_DIR="${GITHUB_WORKSPACE}"
+          cmake --build build-vendored --parallel
+          ctest --test-dir build-vendored --output-on-failure
+      - name: Test installed package integration
+        run: |
+          cmake --install build --prefix "${RUNNER_TEMP}/mkv-install"
+          mv "${RUNNER_TEMP}/mkv-install" "${RUNNER_TEMP}/mkv-relocated"
+          cmake -S tests/consumer -B build-installed -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/mkv-relocated"
+          cmake --build build-installed --parallel
+          ctest --test-dir build-installed --output-on-failure
